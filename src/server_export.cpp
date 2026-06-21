@@ -1,10 +1,25 @@
 #include "server_export.hpp"
+#include "manifest.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 
 namespace fs = std::filesystem;
+
+std::string getJarServerFileName(const Manifest &m) {
+  std::string targetJar = "server.jar";
+
+  if (m.modLoader == "forge")
+    targetJar = "forge.jar";
+  else if (m.modLoader == "fabric")
+    targetJar = "fabric-server-launch.jar";
+  else if (m.modLoader == "quilt")
+    targetJar = "quilt-server-launch.jar";
+
+  return targetJar;
+}
 
 // mod loader installer URLs
 static std::string forgeInstallerUrl(const std::string &mc,
@@ -50,7 +65,7 @@ static void writeBatch(const Manifest &m, const std::string &path) {
   f << "java -version >nul 2>&1\n";
   f << "if errorlevel 1 (\n";
   f << "  echo ERROR: Java is not installed or not in PATH.\n";
-  f << "  echo Download Java from https://adoptium.net\n or any other JDK";
+  f << "  echo Download Java from https://adoptium.net or any other JDK\n";
   f << "  pause\n";
   f << "  exit /b 1\n";
   f << ")\n\n";
@@ -74,7 +89,12 @@ static void writeBatch(const Manifest &m, const std::string &path) {
     f << "curl -L -o \"" << file.path << "\" \"" << file.downloadUrl << "\"\n";
   }
 
-  f << "\necho done! run 'java -jar forge.jar nogui' to start the server.\n";
+  std::string finalJarName = getJarServerFileName(m);
+
+  f << "echo java -Xmx4G -Xms4G -jar " << finalJarName
+    << " nogui > start.bat\n";
+
+  f << "\necho done! double-click 'start.bat' to start the server.\n";
   f << "pause\n";
 }
 
@@ -102,18 +122,19 @@ static void writeShell(const Manifest &m, const std::string &path) {
   f << "#!/usr/bin/env bash\n";
   f << "set -euo pipefail\n\n";
 
-  // Check Java
+  // check Java
   f << "echo \"checking for Java...\"\n";
   f << "if ! command -v java &>/dev/null; then\n";
   f << "  echo \"ERROR: Java is not installed or not in PATH.\"\n";
-  f << "  echo \"Download Java from https://adoptium.net or any other JDK distro\"\n";
+  f << "  echo \"Download Java from https://adoptium.net or any other JDK "
+       "distro\"\n";
   f << "  exit 1\n";
   f << "fi\n\n";
 
   f << "JAVA_VER=$(java -version 2>&1 | head -1)\n";
   f << "echo \"found: $JAVA_VER\"\n\n";
 
-  // Download mod loader installer
+  // download mod loader installer
   f << "echo \"downloading " << m.modLoader << " installer...\"\n";
   f << "curl -L -o loader-installer.jar \"" << loaderUrl << "\"\n\n";
 
@@ -132,8 +153,15 @@ static void writeShell(const Manifest &m, const std::string &path) {
     f << "  \"" << file.downloadUrl << "\"\n";
   }
 
-  f << "\necho \"done! run './start.sh' or 'java -jar forge.jar nogui' to "
-       "start.\"\n";
+  std::string finalJarName = getJarServerFileName(m);
+
+  f << "echo \"#!/usr/bin/env bash\" > start.sh\n";
+  f << "echo \"java -Xmx4G -Xms4G -jar " << finalJarName
+    << " nogui\" >> start.sh\n";
+  f << "chmod +x start.sh\n";
+
+  f << "\necho \"done! run './start.sh' to start the server.\"\n";
+  f.close();
 
   // make it executable
   fs::permissions(path,
@@ -143,13 +171,14 @@ static void writeShell(const Manifest &m, const std::string &path) {
 }
 
 void writeServerExport(const Manifest &m, const std::string &outDir) {
-  fs::create_directories(outDir);
+  fs::path outputFolder(outDir);
+  fs::create_directories(outputFolder);
 
-  std::string batchPath = outDir + "/install.bat";
-  std::string shellPath = outDir + "/install.sh";
+  fs::path batchPath = outputFolder / "install.bat";
+  fs::path shellPath = outputFolder / "install.sh";
 
-  writeBatch(m, batchPath);
-  writeShell(m, shellPath);
+  writeBatch(m, batchPath.string());
+  writeShell(m, shellPath.string());
 
   std::cout << "=> wrote " << batchPath << "\n";
   std::cout << "=> wrote " << shellPath << "\n";
