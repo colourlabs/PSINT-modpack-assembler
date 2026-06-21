@@ -7,6 +7,8 @@
 #include "server_export.hpp"
 #include "wren_bindings.hpp"
 #include "wren_modules.hpp"
+#include "packer.hpp"
+
 #include <cxxopts.hpp>
 #include <wren.hpp>
 
@@ -118,8 +120,8 @@ int cmdBuildServer() {
   return 0;
 }
 
-int cmdPackPrism() {
-  std::cout << "=> packing for Prism Launcher\n";
+int cmdPackPrismMmc() {
+  std::cout << "=> packing for Prism Launcher / MultiMC\n";
 
   WrenVM *vm = makeVM();
   if (!runScript(vm, "build.wren")) {
@@ -130,27 +132,23 @@ int cmdPackPrism() {
   Manifest m = readManifest(vm);
   wrenFreeVM(vm);
 
-  writeManifest(m, "manifest.json");
-  // TODO: zip manifest.json + overrides/ into <name>.mrpack
-  std::cout << "=> pack complete (manifest.json written)\n";
+  std::string outPath = m.name + "-" + m.versionId + "-multimc.zip";
+  packMultiMC(m, "overrides", outPath);
+  
   return 0;
 }
 
 int cmdPackModrinth() {
   std::cout << "=> packing for Modrinth\n";
 
-  WrenVM *vm = makeVM();
-  if (!runScript(vm, "build.wren")) {
-    wrenFreeVM(vm);
-    return 1;
-  }
+  WrenVM* vm = makeVM();
+  if (!runScript(vm, "build.wren")) { wrenFreeVM(vm); return 1; }
 
   Manifest m = readManifest(vm);
   wrenFreeVM(vm);
 
-  writeManifest(m, "manifest.json");
-  // TODO: produce .mrpack bundle
-  std::cout << "=> pack complete (manifest.json written)\n";
+  std::string outPath = m.name + "-" + m.versionId + ".mrpack";
+  packMrpack(m, "overrides", outPath);
   return 0;
 }
 
@@ -176,7 +174,8 @@ static void printHelp() {
   std::cout << "usage: please-speed <command> [target]\n\n";
   std::cout << "commands:\n";
   std::cout << "  build server          read build.wren, write manifest.json\n";
-  std::cout << "  pack prismlauncher    export a Prism Launcher modpack\n";
+  std::cout << "  pack prismlauncher    export a Prism Launcher / MultiMC modpack\n";
+  std::cout << "  pack multimc          export a Prism Launcher modpack\n";
   std::cout << "  pack modrinth         export a Modrinth .mrpack\n";
   std::cout << "  pack server           generate install.sh + install.bat\n\n";
   std::cout << "options:\n";
@@ -215,6 +214,7 @@ int main(int argc, char **argv) {
   if (command == "pack") {
     if (argc < 3) {
       std::cerr << "error: 'pack' requires a target\n";
+      std::cerr << "  please-speed pack multimc\n";
       std::cerr << "  please-speed pack prismlauncher\n";
       std::cerr << "  please-speed pack modrinth\n";
       std::cerr << "  please-speed pack server\n";
@@ -222,7 +222,9 @@ int main(int argc, char **argv) {
     }
     std::string target = argv[2];
     if (target == "prismlauncher")
-      return cmdPackPrism();
+      return cmdPackPrismMmc();
+    if (target == "multimc")
+      return cmdPackPrismMmc();
     if (target == "modrinth")
       return cmdPackModrinth();
     if (target == "server")

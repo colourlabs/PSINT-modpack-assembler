@@ -10,9 +10,9 @@ Why not.
 
 ## building modpacks
 
-Unlike other modpack bundlers which use generic TOML or JSON configuration options, which for programmers and regular people suck to write, "Please Speed I Need This Modpack Assembler" short hand (**PSINT-modpack-assembler**) uses the [wren](https://wren.io/) scripting language as a nice DSL (with also a programming language) to build modpacks easily.
+Unlike other modpack bundlers which use generic TOML or JSON configuration options, which for programmers and regular people suck to write, this assembler uses the [wren](https://wren.io/) scripting language to build modpacks easily.
 
-[wren](https://wren.io/) is quite simple to learn, and for modpack-development you will probably need to understand 3 features of the language.
+wren is quite simple to learn, and for modpack-development you will probably need to understand 3 features of the language.
 
 ### getting started
 
@@ -139,7 +139,8 @@ mod("sodium").side("client").source("modrinth")
 ```
 please-speed build server         resolve mods and write manifest.json
 please-speed pack modrinth        export a Modrinth .mrpack
-please-speed pack prismlauncher   export a Prism Launcher modpack
+please-speed pack prismlauncher   export a Prism Launcher / MultiMC modpack zip
+please-speed pack multimc         alias to "prismlauncher"
 please-speed pack server          generate server install.sh and install.bat
 ```
 

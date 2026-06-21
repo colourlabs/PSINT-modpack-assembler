@@ -24,3 +24,5 @@ struct Manifest {
 };
 
 void writeManifest(const Manifest &manifest, const std::string &outPath);
+
+std::pair<std::string, std::string> hashFile(const std::string &path);

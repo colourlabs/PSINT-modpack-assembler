@@ -45,6 +45,7 @@ executable(
     'src/manifest.cpp',
     'src/server_export.cpp',
     'src/resolver.cpp',
+    'src/packer.cpp',
   ],
   include_directories: [
     'src',
@@ -58,3 +59,5 @@ executable(
     libzip_dep
   ],
 )
+
+subdir('tests')
