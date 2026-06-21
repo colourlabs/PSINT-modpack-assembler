@@ -1,5 +1,4 @@
 #include "wren_bindings.hpp"
-#include "wren.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <string>

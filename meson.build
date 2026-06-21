@@ -8,6 +8,9 @@ project(
   ],
 )
 
+# import cmake stuff for libzip later
+cmake = import('cmake')
+
 wren_dep = dependency(
   'wren',
   fallback: [
@@ -29,6 +32,11 @@ curl = dependency(
   'libcurl',
 )
 
+cxxopts_dep = dependency('cxxopts', fallback: ['cxxopts', 'cxxopts_dep'])
+
+libzip_proj = cmake.subproject('libzip')
+libzip_dep = libzip_proj.dependency('zip')
+
 executable(
   'please-speed',
   sources: [
@@ -39,7 +47,6 @@ executable(
     'src/resolver.cpp',
   ],
   include_directories: [
-    'include',
     'src',
   ],
   dependencies: [
@@ -47,5 +54,7 @@ executable(
     openssl,
     curl,
     yyjson_dep,
+    cxxopts_dep,
+    libzip_dep
   ],
 )

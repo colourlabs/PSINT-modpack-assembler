@@ -145,18 +145,31 @@ please-speed pack server          generate server install.sh and install.bat
 
 ### CurseForge API key
 
-Some mods are exclusive to CurseForge and require an API key to resolve to make life harder for no reason, get one at [console.curseforge.com](https://console.curseforge.com).
+Some mods are exclusive to CurseForge and require an API key to resolve (to make life harder for no reason). Get one at [console.curseforge.com](https://console.curseforge.com).
 
-Set it via environment variable:
+Keys are resolved in this order:
 
+1. `CURSEFORGE_API_KEY` environment variable
+2. `build_config.json` in your project directory
+3. `~/.config/please-speed/config.json` global config
+
+**environment variable:**
 ```bash
 export CURSEFORGE_API_KEY=your-key-here
 ```
 
-Or add it to `~/.config/please-speed/config`:
-
+**project-level `build_config.json`** (recommended, add to `.gitignore`):
+```json
+{
+  "curseforge_api_key": "your-key-here"
+}
 ```
-CURSEFORGE_API_KEY=your-key-here
+
+**global `~/.config/please-speed/config.json`:**
+```json
+{
+  "curseforge_api_key": "your-key-here"
+}
 ```
 
 If a CurseForge mod is missing the key you'll get a clear error at build time.

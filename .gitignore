@@ -1,4 +1,8 @@
 builddir/
 subprojects/wren/
 subprojects/yyjson/
+subprojects/libzip/
+subprojects/cxxopts-3.2.0/
+subprojects/packagecache/
 *.jar
+.cache/

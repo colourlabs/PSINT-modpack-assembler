@@ -1,5 +1,6 @@
 #include "resolver.hpp"
 #include "manifest.hpp"
+
 #include <cstring>
 #include <curl/curl.h>
 #include <openssl/evp.h>
@@ -118,28 +119,44 @@ static std::string hashPath(const std::string &path, const EVP_MD *algo) {
   return ss.str();
 }
 
-// ─── Config: CurseForge API key
-// ───────────────────────────────────────────────
+static std::string readKeyFromJson(const std::string& path) {
+  std::ifstream f(path);
+  if (!f.is_open()) return "";
 
+  std::string contents((std::istreambuf_iterator<char>(f)),
+                        std::istreambuf_iterator<char>());
+
+  yyjson_doc* doc = yyjson_read(contents.c_str(), contents.size(), 0);
+  if (!doc)
+      throw std::runtime_error("invalid JSON in config: " + path);
+
+  yyjson_val* root   = yyjson_doc_get_root(doc);
+  yyjson_val* keyVal = yyjson_obj_get(root, "curseforge_api_key");
+
+  std::string key;
+  if (keyVal && yyjson_is_str(keyVal))
+      key = yyjson_get_str(keyVal);
+
+  yyjson_doc_free(doc);
+  return key;
+}
+
+// config: CurseForge API key
 static std::string getCurseForgeKey() {
   // env var
-  const char *env = std::getenv("CURSEFORGE_API_KEY");
-  if (env && strlen(env) > 0)
-    return env;
+  const char* env = std::getenv("CURSEFORGE_API_KEY");
+  if (env && strlen(env) > 0) return env;
 
-  // local config file ./config
-  const char *home = std::getenv("HOME");
+  // local build_config.json
+  std::string local = readKeyFromJson("build_config.json");
+  if (!local.empty()) return local;
+
+  // global ~/.config/please-speed/config.json
+  const char* home = std::getenv("HOME");
   if (home) {
-    std::string cfgPath = std::string(home) + "/.config/please-speed/config";
-    std::ifstream f(cfgPath);
-    if (!f.is_open()) {
-        throw std::runtime_error("cannot open config file: " + cfgPath);
-    }
-    std::string line;
-    while (std::getline(f, line)) {
-      if (line.rfind("CURSEFORGE_API_KEY=", 0) == 0)
-        return line.substr(19);
-    }
+      std::string global = readKeyFromJson(
+          std::string(home) + "/.config/please-speed/config.json");
+      if (!global.empty()) return global;
   }
 
   return "";
@@ -179,7 +196,7 @@ static ResolvedFile resolveModrinth(const std::string &slug,
                              ")");
   }
 
-  // Iterate to find first "release" version type
+  // iterate to find first "release" version type
   ResolvedFile result;
   bool found = false;
 
@@ -190,7 +207,7 @@ static ResolvedFile resolveModrinth(const std::string &slug,
     if (!vtype || std::string(yyjson_get_str(vtype)) != "release")
       continue;
 
-    // Get first file in this version
+    // get first file in this version
     yyjson_val *files = yyjson_obj_get(version, "files");
     if (!files || yyjson_arr_size(files) == 0)
       continue;
@@ -211,8 +228,6 @@ static ResolvedFile resolveModrinth(const std::string &slug,
 
     if (hashesVal) {
       yyjson_val *s512 = yyjson_obj_get(hashesVal, "sha512");
-      yyjson_val *s256 = yyjson_obj_get(
-          hashesVal, "sha1"); // modrinth provides sha1 not sha256
       if (s512)
         result.sha512 = yyjson_get_str(s512);
     }
