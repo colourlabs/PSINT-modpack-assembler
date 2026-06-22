@@ -30,10 +30,13 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
 
       - name: install meson and ninja
         run: pip install meson ninja
@@ -47,20 +50,23 @@ jobs:
 
       - name: install deps via vcpkg
         run: |
-          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl --triplet x64-windows
+          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl wren yyjson --triplet x64-windows
         shell: pwsh
 
-      - name: build
+      - name: configure build
         run: |
           meson setup build `
             --buildtype=release `
             --backend=ninja `
             -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows/lib/pkgconfig"
 
-          ninja -C build
         shell: pwsh
         env:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+      - name: build
+        run: ninja -C build
+        shell: pwsh
 
       - name: upload
         uses: actions/upload-artifact@v4
