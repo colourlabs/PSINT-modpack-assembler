@@ -37,21 +37,17 @@ jobs:
 
       - name: install meson and ninja
         run: pip install meson ninja
+        shell: pwsh
 
-      - name: cache vcpkg binaries
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.vcpkg-cache
-          key: ${{ runner.os }}-vcpkg-binaries-${{ hashFiles('**/meson.build') }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-binaries-
+      - name: setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg ${{ github.workspace }}/vcpkg
+          ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+        shell: pwsh
 
       - name: install deps via vcpkg
         run: |
-          vcpkg install curl openssl --triplet=x64-windows
-        env:
-          VCPKG_DEFAULT_TRIPLET: x64-windows
-          VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl --triplet x64-windows
         shell: pwsh
 
       - name: build
@@ -59,17 +55,18 @@ jobs:
           meson setup build `
             --buildtype=release `
             --backend=ninja `
-            -Dpkg_config_path="" `
-            --cmake-prefix-path="$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows"
+            -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows/lib/pkgconfig"
+
           ninja -C build
         shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
       - name: upload
         uses: actions/upload-artifact@v4
         with:
           name: please-speed-windows
           path: build/please-speed.exe
-
   build-macos-arm:
     runs-on: macos-latest # M1/M2/M3 (arm64)
     steps:
