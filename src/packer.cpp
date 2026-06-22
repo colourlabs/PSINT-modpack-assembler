@@ -190,10 +190,12 @@ void packMultiMC(const Manifest &m, const std::string &overridesDir,
     throw std::runtime_error("zip: cannot create " + outPath);
 
   std::cout << "  adding instance.cfg\n";
-  zipAddString(archive, buildMmcInstanceCfg(m), "instance.cfg");
+  std::string mmcCfg = buildMmcInstanceCfg(m);
+  zipAddString(archive, mmcCfg, "instance.cfg");
 
   std::cout << "  adding mmc-pack.json\n";
-  zipAddString(archive, buildMmcPackJson(m), "mmc-pack.json");
+  std::string mmcPkJson = buildMmcPackJson(m);
+  zipAddString(archive, mmcPkJson, "mmc-pack.json");
 
   if (fs::exists(overridesDir) && fs::is_directory(overridesDir)) {
     std::cout << "  adding overrides mapped to .minecraft/\n";

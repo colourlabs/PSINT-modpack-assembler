@@ -3,8 +3,11 @@ doctest_dep = doctest_proj.dependency('doctest')
 
 test_src = files(
   'test_main.cpp',
+  'test_modpack_server_export.cpp',
+  'test_packer.cpp',
   '../src/manifest.cpp',
   '../src/server_export.cpp',
+  '../src/packer.cpp',
 )
 
 test_exe = executable(
@@ -15,6 +18,7 @@ test_exe = executable(
     doctest_dep,
     yyjson_dep,
     openssl,
+    libzip_dep,
   ],
 )
 
