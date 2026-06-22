@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 jobs:
   build-linux:
@@ -29,32 +30,27 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            git
-            cmake
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-meson
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-curl
-            mingw-w64-ucrt-x86_64-openssl
-            mingw-w64-ucrt-x86_64-libzip
+      - name: install meson and ninja
+        run: pip install meson ninja
+
+      - name: install deps
+        run: |
+          vcpkg install curl openssl
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows
 
       - name: build
         run: |
-          meson setup build --buildtype=release
+          meson setup build --buildtype=release `
+            -Dcurl_LINK_LIBRARIES="$env:VCPKG_ROOT/installed/x64-windows/lib/libcurl.lib" `
+            --cmake-prefix-path "$env:VCPKG_ROOT/installed/x64-windows"
           ninja -C build
+        shell: pwsh
 
       - name: upload
         uses: actions/upload-artifact@v4
@@ -83,29 +79,8 @@ jobs:
           name: please-speed-macos-arm64
           path: build/please-speed
 
-  build-macos-intel:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: install deps
-        run: brew install curl openssl libzip ninja meson
-
-      - name: build
-        run: |
-          meson setup build --buildtype=release
-          ninja -C build
-
-      - name: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: please-speed-macos-x86_64
-          path: build/please-speed
-
   release:
-      needs: [build-linux, build-windows, build-macos-arm, build-macos-intel]
+      needs: [build-linux, build-windows, build-macos-arm]
       runs-on: ubuntu-latest
       permissions:
         contents: write
@@ -117,7 +92,6 @@ jobs:
           run: |
             mv please-speed-linux/please-speed        please-speed-linux/please-speed-linux
             mv please-speed-macos-arm64/please-speed  please-speed-macos-arm64/please-speed-macos-arm64
-            mv please-speed-macos-x86_64/please-speed please-speed-macos-x86_64/please-speed-macos-intel
 
         - name: create release
           uses: softprops/action-gh-release@v2
@@ -126,5 +100,4 @@ jobs:
               please-speed-linux/please-speed-linux
               please-speed-windows/please-speed.exe
               please-speed-macos-arm64/please-speed-macos-arm64
-              please-speed-macos-x86_64/please-speed-macos-intel
             generate_release_notes: true
