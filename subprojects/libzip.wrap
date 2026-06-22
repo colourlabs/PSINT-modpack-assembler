@@ -3,7 +3,6 @@ directory = libzip
 url = https://github.com/nih-at/libzip.git
 revision = v1.11.4
 depth = 1
-patch_directory = libzip
 
 [provide]
 libzip = libzip_dep
