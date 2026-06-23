@@ -54,7 +54,7 @@ jobs:
 
       - name: install deps via vcpkg
         run: |
-          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl wren yyjson --triplet x64-windows
+          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl zlib --triplet x64-windows
         shell: pwsh
 
       - name: configure build
