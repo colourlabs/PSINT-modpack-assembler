@@ -24,12 +24,16 @@ cxxopts_dep = dependency('cxxopts',
 
 cmake = import('cmake')
 
+vcpkg_path = get_option('vcpkg_path')
+
 libzip_opts = cmake.subproject_options()
 libzip_opts.add_cmake_defines({
   'BUILD_TESTING'  : 'OFF',
   'BUILD_EXAMPLES' : 'OFF',
   'BUILD_OSSFUZZ'  : 'OFF',
-  'CMAKE_PREFIX_PATH' : get_option('vcpkg_path'),
+  'CMAKE_PREFIX_PATH' : vcpkg_path,
+  'ZLIB_INCLUDE_DIR'  : vcpkg_path / 'include',
+  'ZLIB_LIBRARY'      : vcpkg_path / 'lib' / 'zlib.lib',
 })
 
 libzip_proj = cmake.subproject('libzip', options : libzip_opts)
