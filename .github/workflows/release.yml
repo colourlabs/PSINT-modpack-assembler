@@ -100,6 +100,7 @@ jobs:
   release:
     needs: [build-linux, build-windows, build-macos-arm]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
