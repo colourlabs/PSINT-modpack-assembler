@@ -62,8 +62,8 @@ jobs:
           meson setup build `
             --buildtype=release `
             --backend=ninja `
-            -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows/lib/pkgconfig"
-
+            -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows/lib/pkgconfig" `
+            -Dvcpkg_path="$env:VCPKG_ROOT/installed/x64-windows"
         shell: pwsh
         env:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg

@@ -3,6 +3,7 @@ project(
   'cpp',
   'c',
   version : '0.1.0',
+  meson_version : '>=1.1',
   default_options : [
     'cpp_std=c++20',
   ],
@@ -28,6 +29,7 @@ libzip_opts.add_cmake_defines({
   'BUILD_TESTING'  : 'OFF',
   'BUILD_EXAMPLES' : 'OFF',
   'BUILD_OSSFUZZ'  : 'OFF',
+  'CMAKE_PREFIX_PATH' : get_option('vcpkg_path'),
 })
 
 libzip_proj = cmake.subproject('libzip', options : libzip_opts)

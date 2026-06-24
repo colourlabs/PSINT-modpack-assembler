@@ -1,0 +1,1 @@
+option('vcpkg_path', type : 'string', value : '')
