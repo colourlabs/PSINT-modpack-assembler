@@ -54,7 +54,7 @@ jobs:
 
       - name: install deps via vcpkg
         run: |
-          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl zlib --triplet x64-windows
+          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl zlib libzip --triplet x64-windows
         shell: pwsh
 
       - name: configure build
@@ -63,7 +63,6 @@ jobs:
             --buildtype=release `
             --backend=ninja `
             -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows/lib/pkgconfig" `
-            -Dvcpkg_path="$env:VCPKG_ROOT/installed/x64-windows"
         shell: pwsh
         env:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg

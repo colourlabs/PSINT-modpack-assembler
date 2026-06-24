@@ -22,22 +22,7 @@ curl = dependency('libcurl')
 cxxopts_dep = dependency('cxxopts',
   fallback : ['cxxopts', 'cxxopts_dep'])
 
-cmake = import('cmake')
-
-vcpkg_path = get_option('vcpkg_path')
-
-libzip_opts = cmake.subproject_options()
-libzip_opts.add_cmake_defines({
-  'BUILD_TESTING'  : 'OFF',
-  'BUILD_EXAMPLES' : 'OFF',
-  'BUILD_OSSFUZZ'  : 'OFF',
-  'CMAKE_PREFIX_PATH' : vcpkg_path,
-  'ZLIB_INCLUDE_DIR'  : vcpkg_path / 'include',
-  'ZLIB_LIBRARY'      : vcpkg_path / 'lib' / 'zlib.lib',
-})
-
-libzip_proj = cmake.subproject('libzip', options : libzip_opts)
-libzip_dep = libzip_proj.dependency('zip')
+libzip_dep = dependency('libzip')
 
 executable('please-speed',
   sources : [
