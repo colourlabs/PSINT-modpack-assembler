@@ -49,7 +49,6 @@ static void zipAddDir(zip_t *archive, const fs::path &dirPath,
 
     fs::path rel = fs::relative(entry.path(), dirPath);
     std::string zipPath = zipPrefix + "/" + rel.string();
-
     std::replace(zipPath.begin(), zipPath.end(), '\\', '/');
 
     logging::info("adding override: " + zipPath);
@@ -57,23 +56,30 @@ static void zipAddDir(zip_t *archive, const fs::path &dirPath,
   }
 }
 
-// manifest.json builder (modrinth index format)
+// modrinth index format
 
 static std::string buildIndexJson(const Manifest &m) {
   yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
   yyjson_mut_val *root = yyjson_mut_obj(doc);
   yyjson_mut_doc_set_root(doc, root);
 
-  yyjson_mut_obj_add_str(doc, root, "formatVersion", "1");
+  yyjson_mut_obj_add_int(doc, root, "formatVersion", 1);
   yyjson_mut_obj_add_str(doc, root, "game", "minecraft");
   yyjson_mut_obj_add_str(doc, root, "name", m.name.c_str());
   yyjson_mut_obj_add_str(doc, root, "versionId", m.versionId.c_str());
 
   yyjson_mut_val *deps = yyjson_mut_obj(doc);
   yyjson_mut_obj_add_str(doc, deps, "minecraft", m.mcVersion.c_str());
-  std::string loaderKey = m.modLoader + "-loader";
-  yyjson_mut_obj_add_str(doc, deps, loaderKey.c_str(),
-                         m.modLoaderVersion.c_str());
+ 
+  std::string loaderKey;
+  if (m.modLoader == "fabric")
+      loaderKey = "fabric-loader";
+  else if (m.modLoader == "quilt")
+      loaderKey = "quilt-loader";
+  else
+      loaderKey = m.modLoader;
+  yyjson_mut_obj_add_str(doc, deps, loaderKey.c_str(), m.modLoaderVersion.c_str());
+
   yyjson_mut_obj_add_val(doc, root, "dependencies", deps);
 
   yyjson_mut_val *files = yyjson_mut_arr(doc);
@@ -104,13 +110,11 @@ static std::string buildIndexJson(const Manifest &m) {
 
   char *json = yyjson_mut_write(doc, YYJSON_WRITE_PRETTY, nullptr);
   std::string result(json);
-
   free(json);
   yyjson_mut_doc_free(doc);
   return result;
 }
 
-// entry point
 void packMrpack(const Manifest &m, const std::string &overridesDir,
                 const std::string &outPath) {
   int errCode = 0;
@@ -123,7 +127,6 @@ void packMrpack(const Manifest &m, const std::string &overridesDir,
   std::string index = buildIndexJson(m);
   zipAddString(archive, index, "modrinth.index.json");
 
-  // overrides/ directory (if it exists)
   if (fs::exists(overridesDir) && fs::is_directory(overridesDir)) {
     logging::info("adding overrides from " + overridesDir);
     zipAddDir(archive, overridesDir, "overrides");
@@ -137,7 +140,8 @@ void packMrpack(const Manifest &m, const std::string &overridesDir,
   logging::step("wrote " + outPath);
 }
 
-// MultiMC
+// MultiMC / Prism
+
 static std::string buildMmcInstanceCfg(const Manifest &m) {
   return "InstanceType=OneSix\nname=" + m.name + "\n";
 }
@@ -176,7 +180,6 @@ static std::string buildMmcPackJson(const Manifest &m) {
 
   char *json = yyjson_mut_write(doc, YYJSON_WRITE_PRETTY, nullptr);
   std::string result(json);
-
   free(json);
   yyjson_mut_doc_free(doc);
   return result;
@@ -190,13 +193,14 @@ void packMultiMC(const Manifest &m, const std::string &overridesDir,
   if (!archive)
     throw std::runtime_error("zip: cannot create " + outPath);
 
+  std::string instanceCfg = buildMmcInstanceCfg(m);
+  std::string mmcPackJson = buildMmcPackJson(m);
+
   logging::info("adding instance.cfg");
-  std::string mmcCfg = buildMmcInstanceCfg(m);
-  zipAddString(archive, mmcCfg, "instance.cfg");
+  zipAddString(archive, instanceCfg, "instance.cfg");
 
   logging::info("adding mmc-pack.json");
-  std::string mmcPkJson = buildMmcPackJson(m);
-  zipAddString(archive, mmcPkJson, "mmc-pack.json");
+  zipAddString(archive, mmcPackJson, "mmc-pack.json");
 
   if (fs::exists(overridesDir) && fs::is_directory(overridesDir)) {
     logging::info("adding overrides mapped to .minecraft/");
@@ -205,13 +209,20 @@ void packMultiMC(const Manifest &m, const std::string &overridesDir,
 
   logging::info("injecting resolved mods from cache into zip...");
   for (const auto &file : m.files) {
+    // skip server-only mods from client pack
+    if (file.env_client == "unsupported")
+      continue;
+
     std::string filename = fs::path(file.path).filename().string();
     std::string cachePath = ".please-speed-cache/" + filename;
 
     if (fs::exists(cachePath)) {
-      std::string zipDestination = ".minecraft/mods/" + filename;
       logging::info("packing mod: " + filename);
-      zipAddFile(archive, cachePath, zipDestination);
+      zipAddFile(archive, cachePath, ".minecraft/mods/" + filename);
+      if (zip_get_error(archive)->zip_err != 0)
+        throw std::runtime_error("zip error after packing :( " + filename +
+                                 ": " +
+                                 zip_error_strerror(zip_get_error(archive)));
     } else {
       logging::warn("cached mod file missing: " + cachePath);
     }

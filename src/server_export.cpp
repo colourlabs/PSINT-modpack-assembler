@@ -9,15 +9,50 @@
 
 namespace fs = std::filesystem;
 
+// returns the minor version number, e.g. "1.16.5" -> 16, "1.20.1" -> 20
+// returns -1 if it can't be parsed
+static int parseMcMinor(const std::string &mcVersion) {
+  // expects "1.X" or "1.X.Y"
+  size_t firstDot = mcVersion.find('.');
+  if (firstDot == std::string::npos)
+    return -1;
+  size_t secondDot = mcVersion.find('.', firstDot + 1);
+  std::string minorStr =
+      mcVersion.substr(firstDot + 1, secondDot - firstDot - 1);
+  try {
+    return std::stoi(minorStr);
+  } catch (...) {
+    return -1;
+  }
+}
+
+// true if this Forge version relies on the generated run.sh/run.bat
+// launcher instead of producing a directly-runnable server jar
+// (1.17+; also the fallback if the mc version couldn't be parsed)
+static bool forgeUsesRunScript(const Manifest &m) {
+  if (m.modLoader != "forge")
+    return false;
+  int minor = parseMcMinor(m.mcVersion);
+  return minor < 0 || minor >= 17;
+}
+
 std::string getJarServerFileName(const Manifest &m) {
   std::string targetJar = "server.jar";
 
-  if (m.modLoader == "forge")
-    targetJar = "forge.jar";
-  else if (m.modLoader == "fabric")
+  if (m.modLoader == "forge") {
+    int minor = parseMcMinor(m.mcVersion);
+    if (minor >= 0 && minor < 17) {
+      // pre-1.17 Forge installer produces a runnable universal jar
+      targetJar = "forge-" + m.mcVersion + "-" + m.modLoaderVersion +
+                  "-universal.jar";
+    }
+    // 1.17+ doesn't produce a runnable jar at all, handled via
+    // forgeUsesRunScript() in writeBatch/writeShell instead
+  } else if (m.modLoader == "fabric") {
     targetJar = "fabric-server-launch.jar";
-  else if (m.modLoader == "quilt")
+  } else if (m.modLoader == "quilt") {
     targetJar = "quilt-server-launch.jar";
+  }
 
   return targetJar;
 }
@@ -92,10 +127,15 @@ static void writeBatch(const Manifest &m, const std::string &path) {
 
   std::string finalJarName = getJarServerFileName(m);
 
-  f << "echo java -Xmx4G -Xms4G -jar " << finalJarName
-    << " nogui > start.bat\n";
+  if (forgeUsesRunScript(m)) {
+    f << "\necho done! after install finishes, run 'run.bat' to start the "
+         "server.\n";
+  } else {
+    f << "echo java -Xmx4G -Xms4G -jar " << finalJarName
+      << " nogui > start.bat\n";
+    f << "\necho done! double-click 'start.bat' to start the server.\n";
+  }
 
-  f << "\necho done! double-click 'start.bat' to start the server.\n";
   f << "pause\n";
 }
 
@@ -156,12 +196,17 @@ static void writeShell(const Manifest &m, const std::string &path) {
 
   std::string finalJarName = getJarServerFileName(m);
 
-  f << "echo \"#!/usr/bin/env bash\" > start.sh\n";
-  f << "echo \"java -Xmx4G -Xms4G -jar " << finalJarName
-    << " nogui\" >> start.sh\n";
-  f << "chmod +x start.sh\n";
+  if (forgeUsesRunScript(m)) {
+    f << "echo \"done! after install finishes, run './run.sh' to start the "
+         "server.\"\n";
+  } else {
+    f << "echo \"#!/usr/bin/env bash\" > start.sh\n";
+    f << "echo \"java -Xmx4G -Xms4G -jar " << finalJarName
+      << " nogui\" >> start.sh\n";
+    f << "chmod +x start.sh\n";
 
-  f << "\necho \"done! run './start.sh' to start the server.\"\n";
+    f << "\necho \"done! run './start.sh' to start the server.\"\n";
+  }
   f.close();
 
   // make it executable
@@ -178,9 +223,10 @@ void writeServerExport(const Manifest &m, const std::string &outDir) {
   fs::path batchPath = outputFolder / "install.bat";
   fs::path shellPath = outputFolder / "install.sh";
 
+  logging::info("writing " + batchPath.string());
   writeBatch(m, batchPath.string());
+  logging::info("writing " + shellPath.string());
   writeShell(m, shellPath.string());
 
-  logging::step("wrote " + batchPath.string());
-  logging::step("wrote " + shellPath.string());
+  logging::step("server export written to " + outDir);
 }

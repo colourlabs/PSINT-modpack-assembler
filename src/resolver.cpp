@@ -352,10 +352,10 @@ void resolveMods(std::vector<ModFile> &files, const std::string &mcVersion,
       ResolvedFile resolved;
 
       if (source == "url") {
-        logging::source("url", "downloading " + file.downloadUrl);
-        std::string tmpPath =
-            ".please-speed-cache/" + fs::path(file.path).filename().string();
+        std::string filename = fs::path(file.downloadUrl).filename().string();
+        std::string tmpPath = ".please-speed-cache/" + filename;
         httpDownload(file.downloadUrl, tmpPath);
+        file.path = "mods/" + filename;
         file.sha512 = hashPath(tmpPath, EVP_sha512());
         file.sha256 = hashPath(tmpPath, EVP_sha256());
         file.fileSize = fs::file_size(tmpPath);
