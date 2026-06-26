@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+
+#include "log.hpp"
 #include <stdexcept>
 #include <string>
 
@@ -51,7 +53,7 @@ static void zipAddDir(zip_t *archive, const fs::path &dirPath,
 
     std::replace(zipPath.begin(), zipPath.end(), '\\', '/');
 
-    std::cout << "  adding override: " << zipPath << "\n";
+    logging::info("adding override: " + zipPath);
     zipAddFile(archive, entry.path().string(), zipPath);
   }
 }
@@ -118,22 +120,22 @@ void packMrpack(const Manifest &m, const std::string &overridesDir,
   if (!archive)
     throw std::runtime_error("zip: cannot create " + outPath);
 
-  std::cout << "  adding modrinth.index.json\n";
+  logging::info("adding modrinth.index.json");
   std::string index = buildIndexJson(m);
   zipAddString(archive, index, "modrinth.index.json");
 
   // overrides/ directory (if it exists)
   if (fs::exists(overridesDir) && fs::is_directory(overridesDir)) {
-    std::cout << "  adding overrides from " << overridesDir << "\n";
+    logging::info("adding overrides from " + overridesDir);
     zipAddDir(archive, overridesDir, "overrides");
   } else {
-    std::cout << "  no overrides/ directory found, skipping\n";
+    logging::info("no overrides/ directory found, skipping");
   }
 
   if (zip_close(archive) < 0)
     throw std::runtime_error("zip: failed to finalise " + outPath);
 
-  std::cout << "=> wrote " << outPath << "\n";
+  logging::step("wrote " + outPath);
 }
 
 // MultiMC
@@ -189,35 +191,35 @@ void packMultiMC(const Manifest &m, const std::string &overridesDir,
   if (!archive)
     throw std::runtime_error("zip: cannot create " + outPath);
 
-  std::cout << "  adding instance.cfg\n";
+  logging::info("adding instance.cfg");
   std::string mmcCfg = buildMmcInstanceCfg(m);
   zipAddString(archive, mmcCfg, "instance.cfg");
 
-  std::cout << "  adding mmc-pack.json\n";
+  logging::info("adding mmc-pack.json");
   std::string mmcPkJson = buildMmcPackJson(m);
   zipAddString(archive, mmcPkJson, "mmc-pack.json");
 
   if (fs::exists(overridesDir) && fs::is_directory(overridesDir)) {
-    std::cout << "  adding overrides mapped to .minecraft/\n";
+    logging::info("adding overrides mapped to .minecraft/");
     zipAddDir(archive, overridesDir, ".minecraft");
   }
 
-  std::cout << "  injecting resolved mods from cache into zip...\n";
+  logging::info("injecting resolved mods from cache into zip...");
   for (const auto &file : m.files) {
     std::string filename = fs::path(file.path).filename().string();
     std::string cachePath = ".please-speed-cache/" + filename;
 
     if (fs::exists(cachePath)) {
       std::string zipDestination = ".minecraft/mods/" + filename;
-      std::cout << "    packing mod: " << filename << "\n";
+      logging::info("packing mod: " + filename);
       zipAddFile(archive, cachePath, zipDestination);
     } else {
-      std::cerr << "  warning: cached mod file missing: " << cachePath << "\n";
+      logging::warn("cached mod file missing: " + cachePath);
     }
   }
 
   if (zip_close(archive) < 0)
     throw std::runtime_error("zip: failed to finalise " + outPath);
 
-  std::cout << "=> wrote " << outPath << "\n";
+  logging::step("wrote " + outPath);
 }

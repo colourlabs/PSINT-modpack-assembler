@@ -3,12 +3,14 @@
 #include <iostream>
 #include <string>
 
+#include "log.hpp"
+
 // method exposure
 
 // Build.run("cmd") -> bool
 static void build_run(WrenVM *vm) {
   const char *cmd = wrenGetSlotString(vm, 1);
-  std::cout << "$ " << cmd << "\n";
+  logging::info(std::string("$ ") + cmd);
   int ret = std::system(cmd);
   wrenSetSlotBool(vm, 0, ret == 0);
 }
@@ -16,7 +18,7 @@ static void build_run(WrenVM *vm) {
 // Build.log("msg")
 static void build_log(WrenVM *vm) {
   const char *msg = wrenGetSlotString(vm, 1);
-  std::cout << "[build] " << msg << "\n";
+  logging::source("build", msg);
 }
 
 // binding table

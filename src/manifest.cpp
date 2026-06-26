@@ -2,6 +2,8 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+
+#include "log.hpp"
 #include <openssl/evp.h>
 #include <sstream>
 #include <stdexcept>
@@ -104,5 +106,5 @@ void writeManifest(const Manifest &m, const std::string &outPath) {
   free(json);
   yyjson_mut_doc_free(doc);
 
-  std::cout << "=> wrote " << outPath << "\n";
+  logging::step("wrote " + outPath);
 }

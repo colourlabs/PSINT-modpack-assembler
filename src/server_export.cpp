@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+#include "log.hpp"
 #include <string>
 
 namespace fs = std::filesystem;
@@ -180,6 +182,6 @@ void writeServerExport(const Manifest &m, const std::string &outDir) {
   writeBatch(m, batchPath.string());
   writeShell(m, shellPath.string());
 
-  std::cout << "=> wrote " << batchPath << "\n";
-  std::cout << "=> wrote " << shellPath << "\n";
+  logging::step("wrote " + batchPath.string());
+  logging::step("wrote " + shellPath.string());
 }

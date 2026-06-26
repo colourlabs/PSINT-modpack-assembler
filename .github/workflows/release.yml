@@ -9,18 +9,30 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    container: alpine:latest
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: install deps
-        run: sudo apt install -y libcurl4-openssl-dev libssl-dev libzip-dev ninja-build meson
+        run: |
+          apk add --no-cache \
+            g++ meson samurai \
+            curl-dev openssl-dev libzip-dev zlib-dev
 
       - name: build
         run: |
-          meson setup build --buildtype=release
+          meson setup build --buildtype=release --prefer-static \
+            -Db_staticpic=true
           ninja -C build
+
+      - name: verify
+        run: |
+          echo "=== linked libs ==="
+          ldd build/please-speed 2>&1 || true
+          echo "=== file type ==="
+          file build/please-speed
 
       - name: upload
         uses: actions/upload-artifact@v4
@@ -54,7 +66,7 @@ jobs:
 
       - name: install deps via vcpkg
         run: |
-          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl zlib libzip --triplet x64-windows
+          ${{ github.workspace }}/vcpkg/vcpkg.exe install curl openssl zlib libzip --triplet x64-windows-static
         shell: pwsh
 
       - name: configure build
@@ -62,7 +74,8 @@ jobs:
           meson setup build `
             --buildtype=release `
             --backend=ninja `
-            -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows/lib/pkgconfig" `
+            -Ddefault_library=static `
+            -Dpkg_config_path="$env:VCPKG_ROOT/installed/x64-windows-static/lib/pkgconfig" `
         shell: pwsh
         env:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg
@@ -88,8 +101,14 @@ jobs:
 
       - name: build
         run: |
-          meson setup build --buildtype=release
+          export PKG_CONFIG_PATH="$(brew --prefix curl)/lib/pkgconfig:\
+          $(brew --prefix openssl)/lib/pkgconfig:\
+          $(brew --prefix libzip)/lib/pkgconfig"
+          meson setup build --buildtype=release --prefer-static
           ninja -C build
+          
+      - name: check static
+        run: otool -L build/please-speed || true
 
       - name: upload
         uses: actions/upload-artifact@v4

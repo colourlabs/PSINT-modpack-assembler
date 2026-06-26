@@ -2,6 +2,8 @@
 #include "manifest.hpp"
 
 #include <cstring>
+
+#include "log.hpp"
 #include <curl/curl.h>
 #include <openssl/evp.h>
 #include <yyjson.h>
@@ -119,23 +121,24 @@ static std::string hashPath(const std::string &path, const EVP_MD *algo) {
   return ss.str();
 }
 
-static std::string readKeyFromJson(const std::string& path) {
+static std::string readKeyFromJson(const std::string &path) {
   std::ifstream f(path);
-  if (!f.is_open()) return "";
+  if (!f.is_open())
+    return "";
 
   std::string contents((std::istreambuf_iterator<char>(f)),
-                        std::istreambuf_iterator<char>());
+                       std::istreambuf_iterator<char>());
 
-  yyjson_doc* doc = yyjson_read(contents.c_str(), contents.size(), 0);
+  yyjson_doc *doc = yyjson_read(contents.c_str(), contents.size(), 0);
   if (!doc)
-      throw std::runtime_error("invalid JSON in config: " + path);
+    throw std::runtime_error("invalid JSON in config: " + path);
 
-  yyjson_val* root   = yyjson_doc_get_root(doc);
-  yyjson_val* keyVal = yyjson_obj_get(root, "curseforge_api_key");
+  yyjson_val *root = yyjson_doc_get_root(doc);
+  yyjson_val *keyVal = yyjson_obj_get(root, "curseforge_api_key");
 
   std::string key;
   if (keyVal && yyjson_is_str(keyVal))
-      key = yyjson_get_str(keyVal);
+    key = yyjson_get_str(keyVal);
 
   yyjson_doc_free(doc);
   return key;
@@ -144,19 +147,22 @@ static std::string readKeyFromJson(const std::string& path) {
 // config: CurseForge API key
 static std::string getCurseForgeKey() {
   // env var
-  const char* env = std::getenv("CURSEFORGE_API_KEY");
-  if (env && strlen(env) > 0) return env;
+  const char *env = std::getenv("CURSEFORGE_API_KEY");
+  if (env && strlen(env) > 0)
+    return env;
 
   // local build_config.json
   std::string local = readKeyFromJson("build_config.json");
-  if (!local.empty()) return local;
+  if (!local.empty())
+    return local;
 
   // global ~/.config/please-speed/config.json
-  const char* home = std::getenv("HOME");
+  const char *home = std::getenv("HOME");
   if (home) {
-      std::string global = readKeyFromJson(
-          std::string(home) + "/.config/please-speed/config.json");
-      if (!global.empty()) return global;
+    std::string global = readKeyFromJson(std::string(home) +
+                                         "/.config/please-speed/config.json");
+    if (!global.empty())
+      return global;
   }
 
   return "";
@@ -175,12 +181,11 @@ struct ResolvedFile {
 static ResolvedFile resolveModrinth(const std::string &slug,
                                     const std::string &mcVersion,
                                     const std::string &modLoader) {
-  // POST /v2/project/{slug}/version with filters
   std::string url = "https://api.modrinth.com/v2/project/" + slug +
                     "/version?game_versions=[%22" + mcVersion +
                     "%22]&loaders=[%22" + modLoader + "%22]";
 
-  std::cout << "  [modrinth] resolving " << slug << "...\n";
+  logging::source("modrinth", "resolving " + slug + "...");
   std::string body = httpGet(
       url, {"User-Agent: please-speed/0.1 (github.com/you/please-speed)"});
 
@@ -196,50 +201,60 @@ static ResolvedFile resolveModrinth(const std::string &slug,
                              ")");
   }
 
-  // iterate to find first "release" version type
+  // preference order: release > beta > alpha
+  const std::vector<std::string> preference = {"release", "beta", "alpha"};
+
   ResolvedFile result;
   bool found = false;
 
-  size_t idx, max;
-  yyjson_val *version;
-  yyjson_arr_foreach(root, idx, max, version) {
-    yyjson_val *vtype = yyjson_obj_get(version, "version_type");
-    if (!vtype || std::string(yyjson_get_str(vtype)) != "release")
-      continue;
+  for (const auto &targetType : preference) {
+    if (found)
+      break;
 
-    // get first file in this version
-    yyjson_val *files = yyjson_obj_get(version, "files");
-    if (!files || yyjson_arr_size(files) == 0)
-      continue;
+    size_t idx, max;
+    yyjson_val *version;
+    yyjson_arr_foreach(root, idx, max, version) {
+      yyjson_val *vtype = yyjson_obj_get(version, "version_type");
+      if (!vtype || std::string(yyjson_get_str(vtype)) != targetType)
+        continue;
 
-    yyjson_val *file = yyjson_arr_get_first(files);
+      yyjson_val *files = yyjson_obj_get(version, "files");
+      if (!files || yyjson_arr_size(files) == 0)
+        continue;
 
-    yyjson_val *urlVal = yyjson_obj_get(file, "url");
-    yyjson_val *filenameVal = yyjson_obj_get(file, "filename");
-    yyjson_val *sizeVal = yyjson_obj_get(file, "size");
-    yyjson_val *hashesVal = yyjson_obj_get(file, "hashes");
+      yyjson_val *file = yyjson_arr_get_first(files);
+      yyjson_val *urlVal = yyjson_obj_get(file, "url");
+      yyjson_val *filenameVal = yyjson_obj_get(file, "filename");
+      yyjson_val *sizeVal = yyjson_obj_get(file, "size");
+      yyjson_val *hashesVal = yyjson_obj_get(file, "hashes");
 
-    if (!urlVal || !filenameVal)
-      continue;
+      if (!urlVal || !filenameVal)
+        continue;
 
-    result.url = yyjson_get_str(urlVal);
-    result.filename = yyjson_get_str(filenameVal);
-    result.fileSize = sizeVal ? (size_t)yyjson_get_int(sizeVal) : 0;
+      result.url = yyjson_get_str(urlVal);
+      result.filename = yyjson_get_str(filenameVal);
+      result.fileSize = sizeVal ? (size_t)yyjson_get_int(sizeVal) : 0;
 
-    if (hashesVal) {
-      yyjson_val *s512 = yyjson_obj_get(hashesVal, "sha512");
-      if (s512)
-        result.sha512 = yyjson_get_str(s512);
+      if (hashesVal) {
+        yyjson_val *s512 = yyjson_obj_get(hashesVal, "sha512");
+        if (s512)
+          result.sha512 = yyjson_get_str(s512);
+      }
+
+      if (targetType != "release")
+        logging::source("modrinth", slug + " has no release, using " + targetType);
+
+      found = true;
+      break;
     }
-
-    found = true;
-    break;
   }
 
   yyjson_doc_free(doc);
 
   if (!found)
-    throw std::runtime_error("modrinth: no stable release found for " + slug);
+    throw std::runtime_error("modrinth: no versions found for " + slug +
+                             " (mc=" + mcVersion + ", loader=" + modLoader +
+                             ")");
 
   return result;
 }
@@ -257,7 +272,7 @@ static ResolvedFile resolveCurseForge(const std::string &slug,
                                       "Accept: application/json"};
 
   // search for the mod by slug
-  std::cout << "  [curseforge] resolving " << slug << "...\n";
+  logging::source("curseforge", "resolving " + slug + "...");
   std::string searchUrl = "https://api.curseforge.com/v1/mods/search"
                           "?gameId=432&slug=" +
                           slug;
@@ -337,7 +352,7 @@ void resolveMods(std::vector<ModFile> &files, const std::string &mcVersion,
       ResolvedFile resolved;
 
       if (source == "url") {
-        std::cout << "  [url] downloading " << file.downloadUrl << "\n";
+        logging::source("url", "downloading " + file.downloadUrl);
         std::string tmpPath =
             ".please-speed-cache/" + fs::path(file.path).filename().string();
         httpDownload(file.downloadUrl, tmpPath);
@@ -361,10 +376,10 @@ void resolveMods(std::vector<ModFile> &files, const std::string &mcVersion,
 
       std::string cachePath = ".please-speed-cache/" + resolved.filename;
       if (!fs::exists(cachePath)) {
-        std::cout << "  downloading " << resolved.filename << "\n";
+        logging::info("downloading " + resolved.filename);
         httpDownload(resolved.url, cachePath);
       } else {
-        std::cout << "  cached " << resolved.filename << "\n";
+        logging::info("cached " + resolved.filename);
       }
 
       file.sha512 = resolved.sha512.empty() ? hashPath(cachePath, EVP_sha512())
@@ -373,7 +388,7 @@ void resolveMods(std::vector<ModFile> &files, const std::string &mcVersion,
       file.fileSize = fs::file_size(cachePath);
 
     } catch (const std::exception &e) {
-      std::cerr << "error resolving " << slug << ": " << e.what() << "\n";
+      logging::error("resolving " + slug + ": " + e.what());
       throw;
     }
   }

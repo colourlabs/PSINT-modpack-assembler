@@ -2,12 +2,13 @@
 #include <iostream>
 #include <string>
 
+#include "log.hpp"
 #include "manifest.hpp"
+#include "packer.hpp"
 #include "resolver.hpp"
 #include "server_export.hpp"
 #include "wren_bindings.hpp"
 #include "wren_modules.hpp"
-#include "packer.hpp"
 
 #include <cxxopts.hpp>
 #include <wren.hpp>
@@ -60,6 +61,14 @@ static WrenForeignMethodFn bindForeignMethod(WrenVM *, const char *module,
 
 // VM lifecycle
 
+struct WrenVMGuard {
+  WrenVM *vm;
+  explicit WrenVMGuard(WrenVM *v) : vm(v) {}
+  ~WrenVMGuard() { if (vm) wrenFreeVM(vm); }
+  WrenVMGuard(const WrenVMGuard &) = delete;
+  WrenVMGuard &operator=(const WrenVMGuard &) = delete;
+};
+
 WrenVM *makeVM() {
   WrenConfiguration config;
   wrenInitConfiguration(&config);
@@ -73,7 +82,7 @@ WrenVM *makeVM() {
 bool runScript(WrenVM *vm, const std::string &path) {
   std::ifstream f(path);
   if (!f) {
-    std::cerr << "error: cannot open " << path << "\n";
+    logging::error("cannot open " + path);
     return false;
   }
   std::string src((std::istreambuf_iterator<char>(f)),
@@ -105,47 +114,41 @@ Manifest readManifest(WrenVM *vm) {
 // commands
 
 int cmdBuildServer() {
-  std::cout << "=> reading build.wren\n";
+  logging::step("reading build.wren");
 
-  WrenVM *vm = makeVM();
-  if (!runScript(vm, "build.wren")) {
-    wrenFreeVM(vm);
+  WrenVMGuard guard(makeVM());
+  if (!runScript(guard.vm, "build.wren"))
     return 1;
-  }
 
-  Manifest m = readManifest(vm);
-  wrenFreeVM(vm);
+  Manifest m = readManifest(guard.vm);
 
   writeManifest(m, "manifest.json");
   return 0;
 }
 
 int cmdPackPrismMmc() {
-  std::cout << "=> packing for Prism Launcher / MultiMC\n";
+  logging::step("packing for Prism Launcher / MultiMC");
 
-  WrenVM *vm = makeVM();
-  if (!runScript(vm, "build.wren")) {
-    wrenFreeVM(vm);
+  WrenVMGuard guard(makeVM());
+  if (!runScript(guard.vm, "build.wren"))
     return 1;
-  }
 
-  Manifest m = readManifest(vm);
-  wrenFreeVM(vm);
+  Manifest m = readManifest(guard.vm);
 
   std::string outPath = m.name + "-" + m.versionId + "-multimc.zip";
   packMultiMC(m, "overrides", outPath);
-  
+
   return 0;
 }
 
 int cmdPackModrinth() {
-  std::cout << "=> packing for Modrinth\n";
+  logging::step("packing for Modrinth");
 
-  WrenVM* vm = makeVM();
-  if (!runScript(vm, "build.wren")) { wrenFreeVM(vm); return 1; }
+  WrenVMGuard guard(makeVM());
+  if (!runScript(guard.vm, "build.wren"))
+    return 1;
 
-  Manifest m = readManifest(vm);
-  wrenFreeVM(vm);
+  Manifest m = readManifest(guard.vm);
 
   std::string outPath = m.name + "-" + m.versionId + ".mrpack";
   packMrpack(m, "overrides", outPath);
@@ -153,16 +156,13 @@ int cmdPackModrinth() {
 }
 
 int cmdPackServer() {
-  std::cout << "=> building server export\n";
+  logging::step("building server export");
 
-  WrenVM *vm = makeVM();
-  if (!runScript(vm, "build.wren")) {
-    wrenFreeVM(vm);
+  WrenVMGuard guard(makeVM());
+  if (!runScript(guard.vm, "build.wren"))
     return 1;
-  }
 
-  Manifest m = readManifest(vm);
-  wrenFreeVM(vm);
+  Manifest m = readManifest(guard.vm);
 
   writeServerExport(m, "server-export");
   return 0;
@@ -174,7 +174,8 @@ static void printHelp() {
   std::cout << "usage: please-speed <command> [target]\n\n";
   std::cout << "commands:\n";
   std::cout << "  build server          read build.wren, write manifest.json\n";
-  std::cout << "  pack prismlauncher    export a Prism Launcher / MultiMC modpack\n";
+  std::cout
+      << "  pack prismlauncher    export a Prism Launcher / MultiMC modpack\n";
   std::cout << "  pack multimc          export a Prism Launcher modpack\n";
   std::cout << "  pack modrinth         export a Modrinth .mrpack\n";
   std::cout << "  pack server           generate install.sh + install.bat\n\n";
@@ -199,25 +200,25 @@ int main(int argc, char **argv) {
   // build <target>
   if (command == "build") {
     if (argc < 3) {
-      std::cerr << "error: 'build' requires a target\n";
-      std::cerr << "  please-speed build server\n";
+      logging::error("'build' requires a target");
+      logging::info("please-speed build server");
       return 1;
     }
     std::string target = argv[2];
     if (target == "server")
       return cmdBuildServer();
-    std::cerr << "error: unknown build target '" << target << "'\n";
+    logging::error("unknown build target '" + target + "'");
     return 1;
   }
 
   // pack <target>
   if (command == "pack") {
     if (argc < 3) {
-      std::cerr << "error: 'pack' requires a target\n";
-      std::cerr << "  please-speed pack multimc\n";
-      std::cerr << "  please-speed pack prismlauncher\n";
-      std::cerr << "  please-speed pack modrinth\n";
-      std::cerr << "  please-speed pack server\n";
+      logging::error("'pack' requires a target");
+      logging::info("please-speed pack multimc");
+      logging::info("please-speed pack prismlauncher");
+      logging::info("please-speed pack modrinth");
+      logging::info("please-speed pack server");
       return 1;
     }
     std::string target = argv[2];
@@ -229,12 +230,12 @@ int main(int argc, char **argv) {
       return cmdPackModrinth();
     if (target == "server")
       return cmdPackServer();
-    std::cerr << "error: unknown pack target '" << target << "'\n";
-    std::cerr << "  valid: prismlauncher, modrinth, server\n";
+    logging::error("unknown pack target '" + target + "'");
+    logging::info("valid: prismlauncher, modrinth, server");
     return 1;
   }
 
-  std::cerr << "error: unknown command '" << command << "'\n";
-  std::cerr << "run 'please-speed --help' for usage\n";
+  logging::error("unknown command '" + command + "'");
+  logging::info("run 'please-speed --help' for usage");
   return 1;
 }
