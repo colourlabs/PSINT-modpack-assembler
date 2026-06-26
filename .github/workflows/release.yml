@@ -21,8 +21,20 @@ jobs:
       - name: install deps
         run: |
           apk add --no-cache \
-            g++ meson samurai \
-            curl-dev openssl-dev libzip-dev zlib-dev
+            git g++ meson samurai pkgconf \
+            curl-dev curl-static \
+            openssl-dev openssl-libs-static \
+            libzip-dev libzip-static \
+            zlib-dev zlib-static \
+            brotli-dev brotli-static \
+            zstd-dev zstd-static \
+            nghttp2-dev nghttp2-static \
+            libunistring-dev \
+            libidn2-dev \
+            libpsl-dev \
+            bzip2-dev bzip2-static \
+            xz-dev \
+            c-ares-dev c-ares-static
 
       - name: build
         run: |

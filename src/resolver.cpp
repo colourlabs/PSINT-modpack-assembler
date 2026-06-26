@@ -187,7 +187,7 @@ static ResolvedFile resolveModrinth(const std::string &slug,
 
   logging::source("modrinth", "resolving " + slug + "...");
   std::string body = httpGet(
-      url, {"User-Agent: please-speed/0.1 (github.com/you/please-speed)"});
+      url, {"User-Agent: please-speed/0.1 (github.com/colourlabs/please-speed)"});
 
   yyjson_doc *doc = yyjson_read(body.c_str(), body.size(), 0);
   if (!doc)
